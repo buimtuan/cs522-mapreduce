@@ -1,0 +1,89 @@
+Stripe approach for co-occurrence matrix
+
+class Mapper
+
+	method init()
+		H <- new AssociativeArray
+
+	method Map(docid a,doc d)
+		for all term u in record r do
+			for all term v in Window(u) do
+				H{u}{v} <- H{u}{v} + 1
+
+	method close():
+		for all key u in H do
+			Emit(u, H{u})
+
+class Reducer
+
+	method Reduce(term u, AssociativeArray[H1, H2, ...])
+		HFINAL <- new AssociativeArray
+		for all stripe H in [H1, H2, ...] do
+			HFINAL <- HFINAL + H
+			Emit(u, HFINAL)
+
+
+class Mapper
+
+	method init()
+		H <- new AssociativeArray
+
+	method Map(docid a,doc d)
+		for all term u in record r do
+			for all term v in Window(u) do
+				H{(u, v)}++
+
+	method close():
+		for all key k in H do
+			Emit(k, H{k})
+
+class Reducer
+	method Reduce(Pair(u,v), Integer [c1, c2, ...])
+		s <- 0
+		for all integer c in [c1, c2, ...] do
+			s <- s + c
+		Emit((u, v), s)
+
+
+
+In class question
+
+class Mapper
+
+	method init()
+		H <- new AssociativeArray
+
+	method Map(docid a, doc d)
+		prodId <- getProdId()
+		cost <- getCost()
+		price <- getPrice()
+		qty <- getQty()
+		pName <- getPName()
+		category <- d.getCategory()
+		H{(category, (prodId, pName))}{profit} <- H{(prodId, *)}{profit} + (price - cost)*qty
+		H{(category, (prodId, pName))}{qty} <- H{(prodId, *)}{qty} + qty
+		H{(category, (0, *))}{cost} <- H{(prodId, prodId)}{cost} + (price - cost)
+		H{(category, (0, *))}{qty} <- H{(prodId, prodId)}{qty} + qty
+
+	method close()
+		for all key k in H do
+			Emit(k, H{k})
+
+getPartition(Key k, int numReducers)
+	return Math.abs(k.category.hasCode()) % numReducers
+
+class Reducer
+
+	method initialize()
+		cat_ave <- 0
+
+	method Reduce((category, (prodId, pName)), [(p1, q1), (p2, q2)...])
+		qty <- 0
+		profit <- 0
+		for all (p, q) in Pair[(p1, q1), (p2, q2)...] do
+			qty <- qty + q
+			profit <- profit + p
+		if (prodId = 0)
+			cat_ave <- profit / qty
+		else
+			Emit((prodId, pName), (p/q, cat_ave) )
